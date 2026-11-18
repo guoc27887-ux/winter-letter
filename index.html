@@ -1,0 +1,790 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light" />
+    <meta name="theme-color" content="#8f8f9e" />
+    <link rel="icon" href="data:," />
+    <title>冬日来信</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@500;700&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --pink: #ff77a9;
+        --pink-deep: #f75f97;
+        --pink-soft: #ffb9d2;
+        --ink: #4a4453;
+        --ink-soft: #6d6779;
+        --paper: #fffdf7;
+        --bg: #8f8f9e;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        font-family: "Noto Sans SC", -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+        color: var(--ink);
+        overflow-x: hidden;
+        -webkit-tap-highlight-color: transparent;
+      }
+      button { font-family: inherit; cursor: pointer; }
+      button, input, textarea { min-height: 2.75rem; }
+
+      #bgCanvas, #snowCanvas {
+        position: fixed; inset: 0;
+        width: 100%; height: 100%;
+        display: block;
+      }
+      #bgCanvas { z-index: 0; }
+      #snowCanvas { z-index: 30; pointer-events: none; }
+      #dim {
+        position: fixed; inset: 0; z-index: 1;
+        background: rgba(43, 38, 54, 0.30);
+        transition: opacity 0.9s ease;
+        pointer-events: none;
+      }
+
+      main {
+        position: relative; z-index: 2;
+        min-height: 100vh; min-height: 100dvh;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        padding: 24px 16px 96px;
+      }
+
+      .view { display: none; }
+      .view.active { display: block; }
+
+      /* ---------- 弹窗 ---------- */
+      #dialogCard {
+        width: min(430px, calc(100vw - 40px));
+        background: #fff;
+        border-radius: 18px;
+        overflow: hidden;
+        box-shadow: 0 24px 60px rgba(50, 30, 60, 0.38);
+        animation: pop 0.45s cubic-bezier(0.2, 1.35, 0.4, 1) both;
+        transition: opacity 0.35s ease, transform 0.35s ease;
+      }
+      #dialogCard.leaving { opacity: 0; transform: scale(0.92) translateY(10px); }
+      @keyframes pop {
+        from { opacity: 0; transform: scale(0.85) translateY(16px); }
+        to { opacity: 1; transform: scale(1) translateY(0); }
+      }
+      .dialog-head {
+        background: linear-gradient(120deg, #ff8fb8, #ff6fa5);
+        color: #fff;
+        padding: 15px 22px;
+        font-size: 22px; font-weight: 700;
+        letter-spacing: 3px;
+        display: flex; align-items: center; gap: 9px;
+      }
+      .dialog-head svg { flex: none; }
+      .dialog-body { padding: 30px 26px 26px; text-align: center; }
+      .dialog-text { font-size: 17.5px; line-height: 1.75; color: #55505e; margin: 0; }
+      #openBtn {
+        width: 100%; height: 52px; margin-top: 24px;
+        border: none; border-radius: 12px;
+        background: var(--pink);
+        color: #fff; font-size: 17px; font-weight: 500;
+        letter-spacing: 8px; text-indent: 8px;
+        box-shadow: 0 8px 20px rgba(247, 95, 151, 0.35);
+        transition: transform 0.12s ease, background 0.2s ease;
+      }
+      #openBtn:hover { background: var(--pink-deep); }
+      #openBtn:active { transform: scale(0.98); }
+
+      /* ---------- 信封 ---------- */
+      #stage.active { display: flex; flex-direction: column; align-items: center; }
+      .envelope {
+        position: relative;
+        width: min(330px, 82vw);
+        aspect-ratio: 1.55;
+        animation: envIn 0.55s cubic-bezier(0.2, 1.3, 0.4, 1) both;
+        transition: opacity 0.6s ease, transform 0.6s ease;
+        filter: drop-shadow(0 22px 34px rgba(50, 30, 60, 0.35));
+      }
+      .envelope.gone { opacity: 0; transform: scale(0.88) translateY(14px); }
+      @keyframes envIn {
+        from { opacity: 0; transform: scale(0.6) translateY(26px); }
+        to { opacity: 1; transform: scale(1) translateY(0); }
+      }
+      .env-back {
+        position: absolute; inset: 0; z-index: 1;
+        background: #f49ec0; border-radius: 10px;
+      }
+      .env-paper {
+        position: absolute; z-index: 2;
+        left: 6%; right: 6%; top: 7%; height: 86%;
+        background: var(--paper);
+        border-radius: 6px;
+        box-shadow: 0 2px 10px rgba(120, 60, 90, 0.18);
+        display: flex; align-items: center; justify-content: center;
+        transition: transform 0.95s cubic-bezier(0.3, 0.7, 0.3, 1);
+      }
+      .env-pocket {
+        position: absolute; inset: 0; z-index: 3;
+        background: linear-gradient(160deg, #fda6c6, #fb8fb5);
+        border-radius: 10px;
+        clip-path: polygon(0 0, 50% 56%, 100% 0, 100% 100%, 0 100%);
+      }
+      .env-flap {
+        position: absolute; z-index: 4;
+        left: 0; right: 0; top: 0; height: 56%;
+        background: linear-gradient(180deg, #ff9ec2, #f78fb8);
+        clip-path: polygon(0 0, 100% 0, 50% 100%);
+        border-radius: 10px 10px 0 0;
+        transform-origin: top center;
+        transition: transform 0.7s ease, z-index 0s 0.35s;
+      }
+      .envelope.open .env-flap { transform: rotateX(180deg); z-index: 1; }
+      .envelope.open .env-paper { transform: translateY(-60%); }
+      .stage-caption {
+        margin-top: 30px;
+        color: #fff; font-size: 14px; letter-spacing: 4px;
+        text-shadow: 0 2px 10px rgba(50, 30, 60, 0.45);
+        animation: pop 0.6s ease both;
+      }
+
+      /* ---------- 信纸 ---------- */
+      #letterWrap { width: 100%; }
+      #letterWrap.active { display: flex; flex-direction: column; align-items: center; }
+      .letter {
+        position: relative;
+        width: min(600px, calc(100vw - 32px));
+        max-height: 74vh; max-height: 74dvh;
+        overflow-y: auto;
+        background-color: var(--paper);
+        background-image: repeating-linear-gradient(transparent, transparent 35px, #f2e2d2 36px);
+        background-position: 0 12px;
+        border-radius: 14px;
+        padding: 38px 32px 30px;
+        box-shadow: 0 26px 60px rgba(50, 30, 60, 0.38);
+        font-family: "Noto Serif SC", "Songti SC", serif;
+        animation: letterIn 0.65s cubic-bezier(0.2, 1.1, 0.4, 1) both;
+      }
+      @keyframes letterIn {
+        from { opacity: 0; transform: translateY(28px) scale(0.97); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+      }
+      .stamp {
+        position: absolute; top: 16px; right: 18px;
+        width: 52px; padding: 5px 5px 3px;
+        background: #fff;
+        border: 2px dashed var(--pink-soft);
+        border-radius: 4px;
+        transform: rotate(6deg);
+        display: flex; flex-direction: column; align-items: center; gap: 2px;
+      }
+      .stamp span { font-size: 9px; letter-spacing: 2px; color: var(--pink-deep); font-family: "Noto Sans SC", sans-serif; }
+      .letter p {
+        margin: 0 0 6px;
+        font-size: 17px; line-height: 36px;
+        color: #4c4238;
+        text-indent: 2em;
+      }
+      .letter p.greet { text-indent: 0; font-weight: 700; font-size: 18px; margin-bottom: 10px; }
+      .caret {
+        display: inline-block; width: 2px; height: 1.05em;
+        background: var(--pink-deep);
+        vertical-align: -0.15em; margin-left: 1px;
+        animation: blink 0.8s steps(1) infinite;
+      }
+      @keyframes blink { 50% { opacity: 0; } }
+      .sign {
+        text-align: right; margin-top: 16px;
+        opacity: 0; transform: translateY(6px);
+        transition: opacity 0.7s ease, transform 0.7s ease;
+        font-size: 16.5px; line-height: 30px; color: #4c4238;
+      }
+      .sign.show { opacity: 1; transform: none; }
+      .sign-date { font-size: 13.5px; color: #9a8d7c; }
+      .letter-cat { margin-top: 6px; opacity: 0.9; }
+      .letter-actions { margin-top: 20px; display: flex; gap: 12px; animation: pop 0.5s ease both; }
+      .pill-btn {
+        border: 2px solid rgba(255, 255, 255, 0.85);
+        background: rgba(255, 253, 247, 0.95);
+        color: var(--pink-deep);
+        border-radius: 999px;
+        padding: 10px 26px;
+        font-size: 15px; font-weight: 500; letter-spacing: 2px;
+        box-shadow: 0 10px 24px rgba(50, 30, 60, 0.25);
+        transition: transform 0.12s ease;
+      }
+      .pill-btn:active { transform: scale(0.97); }
+
+      /* ---------- 悬浮按钮 ---------- */
+      #musicBtn {
+        position: fixed; z-index: 40;
+        top: calc(env(safe-area-inset-top, 0px) + 14px); right: 16px;
+        border: none; border-radius: 999px;
+        background: rgba(38, 36, 46, 0.78);
+        color: #fff; font-size: 14px; letter-spacing: 1px;
+        padding: 10px 18px; min-height: 44px;
+        backdrop-filter: blur(4px);
+      }
+      #editBtn {
+        position: fixed; z-index: 40;
+        right: 18px; bottom: calc(env(safe-area-inset-bottom, 0px) + 22px);
+        width: 58px; height: 58px; border-radius: 50%;
+        background: rgba(38, 36, 46, 0.9);
+        border: 2px solid rgba(255, 255, 255, 0.8);
+        color: #fff; font-size: 15px; letter-spacing: 2px; text-indent: 2px;
+        box-shadow: 0 12px 26px rgba(30, 20, 40, 0.4);
+        transition: transform 0.12s ease;
+      }
+      #editBtn:active { transform: scale(0.94); }
+
+      /* ---------- 修改面板 ---------- */
+      #editOverlay {
+        position: fixed; inset: 0; z-index: 60;
+        background: rgba(35, 30, 45, 0.55);
+        display: none;
+        align-items: flex-end; justify-content: center;
+      }
+      #editOverlay.show { display: flex; }
+      .sheet {
+        background: #fff;
+        width: min(520px, 100vw);
+        max-height: 88vh; max-height: 88dvh;
+        overflow-y: auto;
+        border-radius: 20px 20px 0 0;
+        padding: 26px 24px calc(env(safe-area-inset-bottom, 0px) + 24px);
+        animation: sheetUp 0.35s cubic-bezier(0.2, 1.1, 0.4, 1) both;
+      }
+      @keyframes sheetUp { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+      @media (min-width: 640px) {
+        #editOverlay { align-items: center; }
+        .sheet { border-radius: 20px; }
+      }
+      .sheet h2 { margin: 0 0 18px; font-size: 19px; letter-spacing: 2px; color: var(--ink); }
+      .sheet label { display: block; font-size: 14px; font-weight: 500; color: var(--ink-soft); margin-bottom: 16px; }
+      .sheet input, .sheet textarea {
+        display: block; width: 100%; margin-top: 7px;
+        border: 1.5px solid #e6dde4; border-radius: 10px;
+        padding: 11px 13px;
+        font: inherit; font-size: 16px; color: var(--ink);
+        background: #fffafc;
+      }
+      .sheet textarea { line-height: 1.7; resize: vertical; }
+      .sheet input:focus, .sheet textarea:focus { outline: 2px solid var(--pink-soft); border-color: var(--pink); }
+      .sheet .hint { margin: -8px 0 16px; font-size: 12.5px; color: #a79fb2; }
+      .sheet-btns { display: flex; gap: 12px; margin-top: 4px; }
+      .sheet-btns button {
+        flex: 1; height: 48px; border-radius: 12px;
+        font-size: 16px; letter-spacing: 3px;
+      }
+      #editCancel { background: #f3eff3; border: none; color: var(--ink-soft); }
+      #editSave { background: var(--pink); border: none; color: #fff; font-weight: 500; }
+
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          animation-duration: 0.01ms !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="bgCanvas" aria-hidden="true"></canvas>
+    <div id="dim"></div>
+    <canvas id="snowCanvas" aria-hidden="true"></canvas>
+
+    <main>
+      <!-- 弹窗 -->
+      <section id="dialogCard" class="view active" aria-label="冬日来信提示">
+        <div class="dialog-head">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+            <path d="M12 2v20M4 6l16 12M20 6L4 18M12 2l-2 3m2-3 2 3M12 22l-2-3m2 3 2-3M4 6l3.6.6M4 6 4.6 9.6M20 18l-3.6-.6m3.6.6-.6-3.6M20 6l-3.6.6M20 6l-.6 3.6M4 18l3.6-.6M4 18l.6-3.6"/>
+          </svg>
+          冬日快乐
+        </div>
+        <div class="dialog-body">
+          <p class="dialog-text" id="dialogPrompt">你有一封冬日来信，确定要打开吗？</p>
+          <button id="openBtn" type="button">确定</button>
+        </div>
+      </section>
+
+      <!-- 信封 -->
+      <section id="stage" class="view" aria-hidden="true">
+        <div class="envelope" id="envelope">
+          <div class="env-back"></div>
+          <div class="env-paper" id="envPaper"></div>
+          <div class="env-pocket"></div>
+          <div class="env-flap"></div>
+        </div>
+        <div class="stage-caption">一封来自冬天的信</div>
+      </section>
+
+      <!-- 信纸 -->
+      <section id="letterWrap" class="view">
+        <article class="letter" id="letterEl" aria-label="信件内容">
+          <div class="stamp" id="stampBox"><span>冬日邮局</span></div>
+          <p class="greet" id="greetEl"></p>
+          <div id="letterBody"></div>
+          <div class="sign" id="signBlock">
+            <div id="signName"></div>
+            <div class="sign-date" id="signDate"></div>
+          </div>
+          <div class="letter-cat" id="letterCat"></div>
+        </article>
+        <div class="letter-actions">
+          <button class="pill-btn" id="replayBtn" type="button">再看一次</button>
+        </div>
+      </section>
+    </main>
+
+    <button id="musicBtn" type="button" aria-label="开关音乐">♪ 音乐开</button>    <button id="editBtn" type="button" aria-label="修改信件">修改</button>
+
+    <!-- 修改面板 -->
+    <div id="editOverlay" role="dialog" aria-modal="true" aria-label="修改信件">
+      <div class="sheet">
+        <h2>修改这封信</h2>
+        <label>收信人
+          <input id="editName" type="text" maxlength="12" autocomplete="off" />
+        </label>
+        <label>信的内容
+          <textarea id="editBody" rows="9"></textarea>
+        </label>
+        <p class="hint">段落之间空一行，打开信时会自动分段。</p>
+        <label>落款
+          <input id="editSign" type="text" maxlength="16" autocomplete="off" />
+        </label>
+        <div class="sheet-btns">
+          <button id="editCancel" type="button">取消</button>
+          <button id="editSave" type="button">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      "use strict";
+      var REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      /* ================= 信件内容 ================= */
+      var state = {
+        name: "陈晓琳",
+        paragraphs: [
+          "见字如面。冬天到了，我想赶在第一场雪落下之前，把这一年的惦记都装进这封信里，寄到你手上。",
+          "天一冷，人就容易想起温暖的事：一杯冒着热气的茶，一条晒过太阳的围巾，还有亮起来的万家灯火。这个冬天，愿你出门有风却不觉寒，回家有灯，也有人等。",
+          "愿你好好吃饭，好好睡觉，把烦恼留给昨天。如果累了，就停下来歇一歇——雪落下来的时候，整个世界都会安静地陪你一会儿。",
+          "最后，把最要紧的话放在这里：冬日快乐，平安喜乐。愿你这个冬天，比雪先到的，是好消息；比寒冷更久的，是被爱包围的日子。"
+        ],
+        signature: "一个惦记你的人"
+      };
+
+      var $ = function (id) { return document.getElementById(id); };
+      var dialogCard = $("dialogCard"), stage = $("stage"), envelope = $("envelope"),
+          letterWrap = $("letterWrap"), letterEl = $("letterEl"),
+          greetEl = $("greetEl"), letterBody = $("letterBody"),
+          signBlock = $("signBlock"), signName = $("signName"), signDate = $("signDate"),
+          dim = $("dim"), musicBtn = $("musicBtn");
+
+      function todayText() {
+        var d = new Date();
+        return d.getFullYear() + "年" + (d.getMonth() + 1) + "月" + d.getDate() + "日";
+      }
+      function applyState() {
+        $("dialogPrompt").textContent = state.name
+          ? state.name + "，你有一封冬日来信，确定要打开吗？"
+          : "你有一封冬日来信，确定要打开吗？";
+        signName.textContent = state.signature;
+        signDate.textContent = todayText();
+      }
+
+      /* ================= 像素小猫背景 ================= */
+      var CAT = [
+        "..K...........K..",
+        ".KBK.........KBK.",
+        ".KPK.........KPK.",
+        ".KBK.........KBK.",
+        "..KKKKKKKKKKKKK..",
+        ".KBBBBBBBBBBBBBK.",
+        ".KBBBBBBBBBBBBBK.",
+        ".KBBEEBBBBBEEBBK.",
+        ".KBBBBBBBBBBBBBK.",
+        ".KBBBBBPPBBBBBBK.",
+        ".KBBBBBBBBBBBBBK.",
+        ".KBPBBBBBBBBBPBK.",
+        "..KBBBBBBBBBBBK..",
+        ".KBBBBBBBBBBBBBK.",
+        ".KBBBBBBBBBBBBBK.",
+        "..KKKKKKKKKKKKKKK"
+      ];
+      var LOAF = CAT.slice(0, 13).concat(["..KKKKKKKKKKKKK.."]);
+      var HEART = [
+        ".KK...KK.",
+        "KRRRKRRRK",
+        "KRRRRRRRK",
+        "KRRRRRRRK",
+        ".KRRRRRK.",
+        "..KRRRK..",
+        "...KRK...",
+        "....K...."
+      ];
+      var SPARKLE = [
+        "...K...",
+        "..KYK..",
+        "..KYK..",
+        "KYYYYYK",
+        "..KYK..",
+        "..KYK..",
+        "...K..."
+      ];
+      var FISH = [
+        "..KKKK....",
+        ".KOOOOK.KK",
+        "KEOOOOKKK.",
+        ".KOOOOK.KK",
+        "..KKKK...."
+      ];
+      var BUTTON = [
+        "..KKKKK..",
+        ".KTTTTTK.",
+        "KTTTTTTTK",
+        "KTTKTKTTK",
+        "KTTTTTTTK",
+        "KTTKTKTTK",
+        "KTTTTTTTK",
+        ".KTTTTTK.",
+        "..KKKKK.."
+      ];
+      var BOW = [
+        ".KK...KK.",
+        "KRRRKRRRK",
+        "KRRRRRRRK",
+        "KRRRKRRRK",
+        ".KK...KK."
+      ];
+      var OUTLINE = "#3f3f4a";
+      function catPalette(body) {
+        return { K: OUTLINE, B: body, P: "#f49ec0", E: OUTLINE };
+      }
+      function makeSprite(rows, palette, px) {
+        var w = 0, i, j;
+        for (i = 0; i < rows.length; i++) w = Math.max(w, rows[i].length);
+        var c = document.createElement("canvas");
+        c.width = w * px; c.height = rows.length * px;
+        var x = c.getContext("2d");
+        for (i = 0; i < rows.length; i++) {
+          for (j = 0; j < rows[i].length; j++) {
+            var col = palette[rows[i][j]];
+            if (col) { x.fillStyle = col; x.fillRect(j * px, i * px, px, px); }
+          }
+        }
+        return c;
+      }
+      function flipped(canvas) {
+        var c = document.createElement("canvas");
+        c.width = canvas.width; c.height = canvas.height;
+        var x = c.getContext("2d");
+        x.translate(c.width, 0); x.scale(-1, 1);
+        x.drawImage(canvas, 0, 0);
+        return c;
+      }
+
+      var bgCanvas = $("bgCanvas");
+      function drawBG() {
+        var W = window.innerWidth, H = window.innerHeight;
+        bgCanvas.width = W; bgCanvas.height = H;
+        var x = bgCanvas.getContext("2d");
+        x.fillStyle = "#8f8f9e";
+        x.fillRect(0, 0, W, H);
+        /* faint polka dots */
+        x.fillStyle = "rgba(255,255,255,0.05)";
+        for (var ry = 23; ry < H; ry += 46) {
+          for (var rx = ((ry / 46) % 2) * 23 + 11; rx < W; rx += 46) {
+            x.beginPath(); x.arc(rx, ry, 3, 0, 7); x.fill();
+          }
+        }
+        var sf = Math.max(0.55, Math.min(1, W / 1000));
+        function P(base) { return Math.max(2, Math.round(base * sf)); }
+        var items = [
+          { s: makeSprite(CAT, catPalette("#dcb287"), P(6)), x: 0.05, y: 0.06 },
+          { s: makeSprite(CAT, catPalette("#f2efe9"), P(5)), x: 0.68, y: 0.16, f: 1 },
+          { s: makeSprite(CAT, catPalette("#e9d8ae"), P(4)), x: 0.34, y: 0.29 },
+          { s: makeSprite(LOAF, catPalette("#8d8d99"), P(6)), x: 0.24, y: 0.68 },
+          { s: makeSprite(CAT, catPalette("#6f6f7a"), P(5)), x: 0.64, y: 0.57, f: 1 },
+          { s: makeSprite(CAT, catPalette("#f2efe9"), P(3)), x: 0.07, y: 0.50 },
+          { s: makeSprite(HEART, { K: "#c04a72", R: "#ef6f9c" }, P(3)), x: 0.30, y: 0.15 },
+          { s: makeSprite(HEART, { K: "#c04a72", R: "#ef6f9c" }, P(2)), x: 0.57, y: 0.36 },
+          { s: makeSprite(HEART, { K: "#c04a72", R: "#ef6f9c" }, P(3)), x: 0.13, y: 0.86 },
+          { s: makeSprite(HEART, { K: "#c04a72", R: "#f78fb8" }, P(2)), x: 0.84, y: 0.80 },
+          { s: makeSprite(SPARKLE, { K: "#c9932b", Y: "#f6cf5f" }, P(3)), x: 0.52, y: 0.08 },
+          { s: makeSprite(SPARKLE, { K: "#c9932b", Y: "#f6cf5f" }, P(2)), x: 0.88, y: 0.42 },
+          { s: makeSprite(SPARKLE, { K: "#c9932b", Y: "#f6cf5f" }, P(2)), x: 0.45, y: 0.86 },
+          { s: makeSprite(FISH, { K: "#8a5a20", O: "#f2a54a", E: "#5b3a12" }, P(3)), x: 0.10, y: 0.74, f: 1 },
+          { s: makeSprite(FISH, { K: "#3c5a78", O: "#7fb2dd", E: "#22384e" }, P(3)), x: 0.80, y: 0.66 },
+          { s: makeSprite(BUTTON, { K: "#3f6f68", T: "#8fc7bd" }, P(3)), x: 0.55, y: 0.90 },
+          { s: makeSprite(BOW, { K: "#c04a72", R: "#f78fb8" }, P(3)), x: 0.47, y: 0.20 }
+        ];
+        items.forEach(function (it) {
+          var spr = it.f ? flipped(it.s) : it.s;
+          x.drawImage(spr, Math.round(it.x * W), Math.round(it.y * H));
+        });
+      }
+
+      /* 信封和信纸里的小像素装饰 */
+      (function decorate() {
+        var heart = makeSprite(HEART, { K: "#c04a72", R: "#ef6f9c" }, 4);
+        heart.style.width = "36px"; heart.style.height = "32px";
+        $("envPaper").appendChild(heart);
+        var stampHeart = makeSprite(HEART, { K: "#c04a72", R: "#ef6f9c" }, 3);
+        stampHeart.style.width = "27px"; stampHeart.style.height = "24px";
+        $("stampBox").insertBefore(stampHeart, $("stampBox").firstChild);
+        var miniCat = makeSprite(CAT, catPalette("#dcb287"), 2);
+        miniCat.style.width = "34px"; miniCat.style.height = "32px";
+        $("letterCat").appendChild(miniCat);
+      })();
+
+      /* ================= 落雪 ================= */
+      var snowCanvas = $("snowCanvas"), flakes = [], snowRAF = null;
+      function initSnow() {
+        snowCanvas.width = window.innerWidth;
+        snowCanvas.height = window.innerHeight;
+        var n = Math.round(Math.min(110, window.innerWidth / 9));
+        flakes = [];
+        for (var i = 0; i < n; i++) {
+          flakes.push({
+            x: Math.random() * snowCanvas.width,
+            y: Math.random() * snowCanvas.height,
+            r: 0.8 + Math.random() * 2.1,
+            s: 0.35 + Math.random() * 0.85,
+            ph: Math.random() * 6.28,
+            sw: 0.3 + Math.random() * 0.7,
+            a: 0.45 + Math.random() * 0.5
+          });
+        }
+      }
+      function drawSnowFrame(t) {
+        var x = snowCanvas.getContext("2d");
+        x.clearRect(0, 0, snowCanvas.width, snowCanvas.height);
+        x.fillStyle = "#ffffff";
+        flakes.forEach(function (f) {
+          f.y += f.s;
+          f.x += Math.sin(t / 1600 + f.ph) * f.sw * 0.4;
+          if (f.y > snowCanvas.height + 4) { f.y = -4; f.x = Math.random() * snowCanvas.width; }
+          x.globalAlpha = f.a;
+          x.beginPath(); x.arc(f.x, f.y, f.r, 0, 7); x.fill();
+        });
+        x.globalAlpha = 1;
+        snowRAF = requestAnimationFrame(drawSnowFrame);
+      }
+      function startSnow() {
+        initSnow();
+        if (REDUCED) { drawSnowFrame(0); if (snowRAF) cancelAnimationFrame(snowRAF); snowRAF = null; }
+        else if (!snowRAF) snowRAF = requestAnimationFrame(drawSnowFrame);
+      }
+
+      /* ================= 音乐盒 ================= */
+      var actx = null, master = null, musicOn = false, loopTimer = null;
+      var musicWanted = true, letterOpen = false;
+      var BEAT = 0.38;
+      var MELODY = [
+        [76,1],[79,1],[81,2],[79,1],[76,1],[74,1],[72,2],[74,1],[76,1],[79,2],[76,1],[74,1],[72,3],[0,1],
+        [76,1],[79,1],[81,2],[79,1],[81,1],[84,1],[81,2],[79,1],[76,1],[74,1],[72,1],[74,1],[76,2],[0,2]
+      ];
+      var BASS = [48, 55, 57, 55, 48, 55, 53, 55, 48, 55];
+      function midiHz(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+      function initAudio() {
+        if (actx) return;
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        actx = new AC();
+        master = actx.createGain();
+        master.gain.value = 0.9;
+        master.connect(actx.destination);
+      }
+      function pluck(midi, when, vol, decay) {
+        var f = midiHz(midi);
+        var parts = [[1, vol, decay], [3, vol * 0.22, decay * 0.45], [4.16, vol * 0.07, decay * 0.25]];
+        parts.forEach(function (p) {
+          var o = actx.createOscillator(), g = actx.createGain();
+          o.type = "sine"; o.frequency.value = f * p[0];
+          g.gain.setValueAtTime(0.0001, when);
+          g.gain.exponentialRampToValueAtTime(Math.max(p[1], 0.0002), when + 0.006);
+          g.gain.exponentialRampToValueAtTime(0.0001, when + p[2]);
+          o.connect(g); g.connect(master);
+          o.start(when); o.stop(when + p[2] + 0.1);
+        });
+      }
+      function scheduleLoop() {
+        if (!musicOn || !actx) return;
+        var t = actx.currentTime + 0.08, t0 = t, i;
+        for (i = 0; i < MELODY.length; i++) {
+          if (MELODY[i][0] > 0) pluck(MELODY[i][0], t, 0.16, 1.5);
+          t += MELODY[i][1] * BEAT;
+        }
+        var bt = t0, gi = 0;
+        while (bt < t) { pluck(BASS[gi % BASS.length], bt, 0.05, 2.4); bt += 4 * BEAT; gi++; }
+        loopTimer = setTimeout(scheduleLoop, (t - t0) * 1000 - 60);
+      }
+      function startMusic() {
+        initAudio();
+        if (!actx) return;
+        if (actx.state === "suspended") actx.resume();
+        if (musicOn) return;
+        musicOn = true;
+        scheduleLoop();
+      }
+      function stopMusic() {
+        musicOn = false;
+        if (loopTimer) { clearTimeout(loopTimer); loopTimer = null; }
+        if (actx && actx.state === "running") actx.suspend();
+      }
+      function refreshMusicBtn() {
+        musicBtn.textContent = musicWanted ? "♪ 音乐开" : "♪ 音乐关";
+      }
+      musicBtn.addEventListener("click", function () {
+        musicWanted = !musicWanted;
+        if (letterOpen) { if (musicWanted) startMusic(); else stopMusic(); }
+        refreshMusicBtn();
+      });
+
+      /* ================= 打字机 ================= */
+      var typeTimer = null, typing = false, skipType = false;
+      function clearType() {
+        if (typeTimer) { clearTimeout(typeTimer); typeTimer = null; }
+        typing = false;
+      }
+      function typeLetter() {
+        clearType();
+        letterBody.innerHTML = "";
+        greetEl.textContent = "";
+        signBlock.classList.remove("show");
+        var items = ["亲爱的" + (state.name || "朋友") + "："].concat(state.paragraphs);
+        var targets = [greetEl];
+        state.paragraphs.forEach(function () {
+          var p = document.createElement("p");
+          letterBody.appendChild(p);
+          targets.push(p);
+        });
+        function fillAll() {
+          targets.forEach(function (t, i) { t.textContent = items[i]; });
+          typing = false;
+          signBlock.classList.add("show");
+          letterEl.scrollTop = letterEl.scrollHeight;
+        }
+        if (REDUCED) { fillAll(); return; }
+        typing = true; skipType = false;
+        var caret = document.createElement("span");
+        caret.className = "caret";
+        var i = 0, j = 0;
+        function step() {
+          if (!typing) return;
+          if (skipType) { caret.remove(); fillAll(); return; }
+          if (i >= items.length) {
+            typing = false; caret.remove();
+            signBlock.classList.add("show");
+            return;
+          }
+          var text = items[i], target = targets[i];
+          if (j === 0) target.appendChild(caret);
+          if (j < text.length) {
+            var ch = text[j];
+            target.insertBefore(document.createTextNode(ch), caret);
+            j++;
+            letterEl.scrollTop = letterEl.scrollHeight;
+            var d = 40 + ("，。；：、！？…".indexOf(ch) >= 0 ? 150 : 0);
+            typeTimer = setTimeout(step, d);
+          } else {
+            i++; j = 0;
+            typeTimer = setTimeout(step, 380);
+          }
+        }
+        step();
+      }
+      letterEl.addEventListener("click", function () {
+        if (typing) skipType = true;
+      });
+
+      /* ================= 流程 ================= */
+      var animTimers = [];
+      function later(fn, ms) { animTimers.push(setTimeout(fn, ms)); }
+      function clearAnim() {
+        animTimers.forEach(clearTimeout);
+        animTimers = [];
+      }
+      function showView(el) {
+        [dialogCard, stage, letterWrap].forEach(function (v) { v.classList.remove("active"); });
+        el.classList.add("active");
+      }
+      function openLetter() {
+        initAudio();
+        letterOpen = true;
+        dialogCard.classList.add("leaving");
+        later(function () {
+          dialogCard.classList.remove("leaving");
+          showView(stage);
+          stage.setAttribute("aria-hidden", "false");
+          dim.style.opacity = "0.35";
+        }, 360);
+        later(function () {
+          envelope.classList.add("open");
+          if (musicWanted) startMusic();
+        }, 950);
+        later(function () { envelope.classList.add("gone"); }, 2250);
+        later(function () {
+          showView(letterWrap);
+          dim.style.opacity = "0.55";
+          letterEl.scrollTop = 0;
+          typeLetter();
+        }, 2750);
+      }
+      function resetAll() {
+        clearAnim();
+        clearType();
+        letterOpen = false;
+        stopMusic();
+        refreshMusicBtn();
+        envelope.classList.remove("open");
+        envelope.classList.remove("gone");
+        stage.setAttribute("aria-hidden", "true");
+        showView(dialogCard);
+        dim.style.opacity = "1";
+      }
+      $("openBtn").addEventListener("click", openLetter);
+      $("replayBtn").addEventListener("click", resetAll);
+
+      /* ================= 修改 ================= */
+      var editOverlay = $("editOverlay");
+      $("editBtn").addEventListener("click", function () {
+        $("editName").value = state.name;
+        $("editBody").value = state.paragraphs.join("\n\n");
+        $("editSign").value = state.signature;
+        editOverlay.classList.add("show");
+      });
+      $("editCancel").addEventListener("click", function () {
+        editOverlay.classList.remove("show");
+      });
+      editOverlay.addEventListener("click", function (e) {
+        if (e.target === editOverlay) editOverlay.classList.remove("show");
+      });
+      $("editSave").addEventListener("click", function () {
+        state.name = $("editName").value.trim();
+        var paras = $("editBody").value.split(/\n+/).map(function (s) { return s.trim(); }).filter(Boolean);
+        if (paras.length) state.paragraphs = paras;
+        state.signature = $("editSign").value.trim() || "一个惦记你的人";
+        applyState();
+        editOverlay.classList.remove("show");
+        resetAll();
+      });
+
+      /* ================= 启动 ================= */
+      var resizeTimer = null;
+      window.addEventListener("resize", function () {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(function () {
+          drawBG();
+          if (snowRAF) { cancelAnimationFrame(snowRAF); snowRAF = null; }
+          startSnow();
+        }, 180);
+      });
+      applyState();
+      drawBG();
+      startSnow();
+    </script>
+  </body>
+</html>
